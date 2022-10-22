@@ -34,8 +34,5 @@ public class Person {
 
     @Column(unique = true)
     private String email;
-    
-    @OneToMany
-    private List<Note> notes = new ArrayList<>();
 }
 

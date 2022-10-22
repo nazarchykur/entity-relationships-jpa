@@ -1,13 +1,36 @@
 package com.example.entityrelationshipsjpa;
 
+import com.example.entityrelationshipsjpa.entity.Note;
+import com.example.entityrelationshipsjpa.entity.Person;
+import com.example.entityrelationshipsjpa.service.NoteService;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.ConfigurableApplicationContext;
 
 @SpringBootApplication
 public class EntityRelationshipsJpaApplication {
 
     public static void main(String[] args) {
-        SpringApplication.run(EntityRelationshipsJpaApplication.class, args);
+//        SpringApplication.run(EntityRelationshipsJpaApplication.class, args);
+        ConfigurableApplicationContext context = SpringApplication.run(EntityRelationshipsJpaApplication.class, args);
+
+        NoteService noteService = context.getBean(NoteService.class);
+        Person person = new Person();
+        person.setFirstName("Jane");
+        person.setLastName("Smith");
+        person.setEmail("janesmith@gmail.com");
+
+        Note note = new Note("some note...");
+        note.setPerson(person); // запишуться дані у колонці person_id (FK) як id цього Person в БД
+
+        noteService.saveNoteWithPerson(note, person);
+        
+        /*
+            тут ми спочатку створюємо Person 
+            потім створюємо Note і передаємо цього Person у поле на стороні дочірньої Entity
+            
+            все відпрацює коректно = відбудуться 2 інсерти в БД з потрібними даними
+         */
     }
 }
 
@@ -62,7 +85,7 @@ public class EntityRelationshipsJpaApplication {
     це все буде мати різний варіант створення і відображення наших Entity
     
     отже з точки Java за допомогою Hibernate може показати 3 варіанти:
-     - 1) (ЦЕЙ ВАРІАНТ НЕ ДОБРИЙ) вказати тільки зі сторони Person
+     - 1) (ЦЕЙ ВАРІАНТ НЕ ДОБРИЙ на стороні БД) вказати тільки зі сторони Person
                 @OneToMany
                 private List<Note> notes = new ArrayList<>();
                 
@@ -71,4 +94,17 @@ public class EntityRelationshipsJpaApplication {
             - notes
             - persons
             - persons_notes       (створиться зайва таблиця для цього зв'язку)
+            
+            
+     - 2) (ЦЕЙ ВАРІАНТ НЕ ДОБРИЙ на стороні JAVA у подальшій роботі з цими Entities) вказати тільки зі сторони Notes як чайлд таблиці   (unidirectional mapping)  
+                 @ManyToOne
+                 // @JoinColumn(name = "person_id") // по замовчуванню так і створить
+                 private Person person;  
+                   
+        = згенерується 2 таблички:
+            - notes  де будуть 3 колонки = 2 поля від notes + 1 колонка FK як посилання на табл. persons(id) PK
+            - persons 
+            
+        тобто з точки БД все працює добре і ефективно, але не зручно працювати зі сторони JAVA              
+        бо, наприклад, ми дістанемо якогось Person, але в нас немає доступу до його Note
  */
