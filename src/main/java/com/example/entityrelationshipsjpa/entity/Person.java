@@ -5,6 +5,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 
+import javax.persistence.CascadeType;
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
@@ -26,13 +27,28 @@ public class Person {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private int id;
+    private Long id;
 
+    @Column(nullable = false) // означає, що ця колонка має бути NOT NULL | працює тільки при генерації БД
     private String firstName;
 
+    @Column(nullable = false) // означає, що ця колонка має бути NOT NULL | працює тільки при генерації БД
     private String lastName;
 
-    @Column(unique = true)
+    @Column(nullable = false, unique = true)
     private String email;
+
+    @OneToMany(mappedBy = "person", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Note> notes = new ArrayList<>();
+    
+    public void addNote(Note note) {
+        note.setPerson(this);
+        notes.add(note);
+    }
+    
+    public void removeNote(Note note) {
+        note.setPerson(null);
+        notes.remove(note);
+    }
 }
 
