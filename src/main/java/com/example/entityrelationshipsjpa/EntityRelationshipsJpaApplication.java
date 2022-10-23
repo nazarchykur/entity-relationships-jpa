@@ -2,12 +2,16 @@ package com.example.entityrelationshipsjpa;
 
 import com.example.entityrelationshipsjpa.entity.Note;
 import com.example.entityrelationshipsjpa.entity.Person;
+import com.example.entityrelationshipsjpa.repository.NoteRepository;
+import com.example.entityrelationshipsjpa.repository.PersonRepository;
 import com.example.entityrelationshipsjpa.service.NoteService;
 import com.example.entityrelationshipsjpa.service.PersonService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.ConfigurableApplicationContext;
 
+@Slf4j
 @SpringBootApplication
 public class EntityRelationshipsJpaApplication {
 
@@ -155,7 +159,16 @@ public class EntityRelationshipsJpaApplication {
                 ...
                 Caused by: org.postgresql.util.PSQLException: ERROR: insert or update on table "notes" violates foreign key constraint "notes_persons_fk"
          */
-        
+
+        NoteRepository noteRepository = context.getBean(NoteRepository.class);
+        log.info("get Notes by personId = " + 1 + " :" + noteRepository.findAllByPersonId(1L));
+        // get Notes by personId = 1 :[Note(id=1, body=some note...), Note(id=3, body=new note 2), Note(id=4, body=new note 3)]
+
+        PersonRepository personRepository = context.getBean(PersonRepository.class);
+        log.info("get Person => " + personRepository.findById(1L));
+        // failed to lazily initialize a collection of role: com.example.entityrelationshipsjpa.entity.Person.notes, could not initialize proxy - no Session
+        // впаде через помилку = пізніше розглянемо як ефективно працювати з підгрузкою потрібного поля 
+
     }
 }
 
@@ -300,7 +313,34 @@ public class EntityRelationshipsJpaApplication {
         - 5) можна використати FetchType.LAZY for @ManyToOne association
         
         - 6) Think twice before using CascadeType.Remove
+        
+        - 7) implementing toString is bad from a performance perspective.
+                метод toString може використовувати будь-які базові атрибути сутності (які потрібні для ідентифікації певної сутності при логуванні),
+                якщо базові атрибути витягуються під час завантаження сутності з бази даних, бо Hibernate дозволяє ліниво завантажувати ці атрибути.
+                
+                
+        - 8) Equals and hashCode
+        
+            According to Java specification, a good equals implementation must have the following properties:
+                - reflexive = Рефлексивність
+                    для будь-якого заданого значення x, вираз x.equals(x) має повертати true.
+                    при умові, що   x != null
+                
+                - symmetric = Симетричність
+                    для будь-яких заданих значень x і y, x.equals(y) має повертати true тільки в тому випадку,
+                    коли y.equals(x) true.    
            
+                 - transitive = Транзитивність
+                    для будь-яких заданих значень x, y і z, якщо x.equals(y) повертає true та y.equals(z) повертає true,
+                    то x.equals(z) має повернути значення true.
+
+                - consistent = Узгодженість
+                    для будь-яких заданих значень x та y повторний виклик x.equals(y) повертатиме значення попереднього 
+                    виклику цього методу за умови, що поля, які використовуються для порівняння цих двох об'єктів, 
+                    не змінювалися між викликами.
+                    
+                - Порівняння null
+                    для будь-якого заданого значення x виклик x.equals(null) повинен повертати false.
   =======================================================================================================================
       !!! Висновок: для відображення many-to-one / one-to-many association
         потрібно використовувати Bidirectional associations = BEST PRACTICE:
@@ -328,5 +368,9 @@ public class EntityRelationshipsJpaApplication {
                     public void removeNote(Note note) {
                         note.setPerson(null);
                         notes.remove(note);
-                    }      
+                    }
+                    
+         4. завжди пам'ятати за 
+             - ToString
+             - Equals and HashCode             
  */

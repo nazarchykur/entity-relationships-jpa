@@ -1,5 +1,6 @@
 package com.example.entityrelationshipsjpa.entity;
 
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -16,7 +17,8 @@ import javax.persistence.JoinColumn;
 import javax.persistence.ManyToOne;
 import javax.persistence.Table;
 
-@ToString(exclude = "person")
+@ToString(exclude = {"person"})
+@EqualsAndHashCode(exclude = {"person"})
 @Getter
 @Setter
 @NoArgsConstructor
