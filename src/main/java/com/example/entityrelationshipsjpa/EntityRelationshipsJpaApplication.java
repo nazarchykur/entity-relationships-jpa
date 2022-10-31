@@ -589,3 +589,63 @@ public class EntityRelationshipsJpaApplication {
            отримати всю необхідну інформацію на рівні сервісу.                                    
                                 
  */
+
+
+/*
+    @Query in JPA
+    
+    = Використовуючи параметри на основі позиції, ви повинні стежити за порядком, у якому ви надаєте параметри в:
+            
+            @Query("SELECT c FROM Client c WHERE c.name = ?1 AND c.age = ?2")
+            List<Client> findAll(String name, int age);
+            
+      Перший параметр, переданий у метод, відображається на ?1, другий – на ?2, і т. д. 
+      Якщо ви випадково переплутати ці параметри, ваш запит, швидше за все, видасть виняток або мовчки видасть неправильні результати.
+      
+      
+    = З іншого боку, іменовані параметри мають імена, і на них можна посилатися за іменами, незалежно від їхньої позиції:
+            @Query("SELECT c FROM Client c WHERE c.name = :name and c.age = :age")
+            List<Client> findByName(@Param("name") String name, @Param("age") int age);
+            
+     Ім’я в @Param анотації зіставляється з іменованими параметрами в @Query анотації, 
+     тож ви можете називати свої змінні як завгодно, але для узгодженості радимо використовувати те саме ім’я.
+
+    Якщо ви не надаєте відповідність @Param для названого параметра в запиті, під час компіляції створюється виняток:
+    
+            @Query("SELECT c FROM Client c WHERE c.name = :name and c.age = :age")
+            List<Client> findByName(@Param("name") String name, @Param("num1") int age);
+    Призводить до:
+        java.lang.IllegalStateException: Using named parameters for method public abstract ClientRepository.findByName(java.lang.String,int) 
+        but parameter 'Optional[num1]' not found in annotated query 'SELECT c FROM Client c WHERE c.name = :name and c.age = :age'!
+        
+        
+        =====================================================================================================================
+        
+    Insert, update, and delete an entity using Spring Data JPA @Modifying Annotation.
+    
+        DELETE і UPDATE запити називаються модифікуючими запитами і повинні мати додаткову анотацію: @Modifying. 
+        Це ініціює запит в @Query анотації, щоб він міг виконувати зміни сутностей, а не просто отримувати дані.
+
+        Без додаткової @Modifying анотації ми б зіткнулися з InvalidDataAccessApiUsageException, що повідомляє нам, 
+        що @Query анотація не підтримує оператори DML (мова маніпулювання даними) :
+        
+                @Modifying
+                @Query(“DELETE c FROM Client c WHERE c.name = :name”)
+                void deleteClientByName(@Param("name") String name);
+                
+                @Modifying
+                @Query(“UPDATE Client c WHERE c.id = :id”)
+                void updateUserById(@Param("id") long id);
+                
+    !!! Примітка. 
+    У методі, де ми використовуємо анотацію @Modifying, тип повернення має бути int або void. В іншому випадку буде створено виняток
+    
+    
+    Insert an entity using Spring Data JPA @Modifying annotation.
+    
+            @Modifying
+            @Query(value = "insert into Student (id,student_name,roll_number, university) VALUES(:id,:studentName,:rollNumber,:university)", nativeQuery = true)
+            public void insertStudentUsingQueryAnnotation(@Param("id") int id, @Param("studentName") String studentName,
+                    @Param("rollNumber") String rollNumber, @Param("university") String university);             
+        
+ */
