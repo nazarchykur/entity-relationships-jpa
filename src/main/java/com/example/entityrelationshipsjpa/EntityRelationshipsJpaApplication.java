@@ -164,11 +164,15 @@ public class EntityRelationshipsJpaApplication {
         log.info("get Notes by personId = " + 1 + " :" + noteRepository.findAllByPersonId(1L));
         // get Notes by personId = 1 :[Note(id=1, body=some note...), Note(id=3, body=new note 2), Note(id=4, body=new note 3)]
 
-        PersonRepository personRepository = context.getBean(PersonRepository.class);
-        log.info("get Person => " + personRepository.findById(1L));
+//        PersonRepository personRepository = context.getBean(PersonRepository.class);
+//        log.info("get Person => " + personRepository.findById(1L));
         // failed to lazily initialize a collection of role: com.example.entityrelationshipsjpa.entity.Person.notes, could not initialize proxy - no Session
         // впаде через помилку = пізніше розглянемо як ефективно працювати з підгрузкою потрібного поля 
 
+        Person person2 = personService.findBy(1L);
+        log.info("get Person => " + person2);
+//        get Person => Person(id=1, firstName=Jane, lastName=Smith, email=janesmith@gmail.com, 
+//        notes=[Note(id=1, body=some note...), Note(id=3, body=new note 2), Note(id=4, body=new note 3)])
     }
 }
 
@@ -373,4 +377,215 @@ public class EntityRelationshipsJpaApplication {
          4. завжди пам'ятати за 
              - ToString
              - Equals and HashCode             
+ */
+
+/*
+    LazyInitializationException – What it is and the best way to fix it
+    
+    https://thorben-janssen.com/lazyinitializationexception/
+    
+    https://vladmihalcea.com/the-hibernate-enable_lazy_load_no_trans-anti-pattern/
+    
+    
+    Виняток LazyInitializationException є одним із найпоширеніших винятків під час роботи зі Hibernate. 
+    Є кілька простих способів як це виправити, але також можна знайти безліч поганих порад:
+        - деякі виправлення часто замінюють виняток прихованою проблемою, яка спричиняє проблеми у PROD. 
+        - деякі з них спричиняють проблеми з самою продуктивністю
+        - інші можуть створювати суперечливі результати.
+        
+    Hibernate створює виключення LazyInitializationException, коли йому потрібно ініціалізувати ліниво отриману асоціацію 
+    з іншою сутністю без активного контексту сеансу. Зазвичай це відбувається, якщо ви намагаєтесь використати 
+    неініціалізовану асоціацію у своїй клієнтській програмі чи веб-рівні.
+    
+    Наприклад, Author + Books (One-to-Many + Many-to-One). також це стосується і One-to-One, де ми поставили FetchType.LAZY + визначили CascadeType
+    
+    Отже, наприклад ми дістали по якомусь критерію деякий список авторів, а потім у кожного автора дістаємо його книги
+    
+                List<Author> authors = query.getResultList();
+                em.getTransaction().commit();         // десь у коді закрили транзакцію, або це наприклад був 
+                em.close();                           // якийсь метод сервісу, після виклику якого, сесія також закрилася
+                
+                // опісля хочемо отримати книги цих авторів для наступної операції
+                for (Author author : authors) {
+                    List<Book> books = author.getBooks();
+                    log.info("... the next line will throw LazyInitializationException ...");
+                    books.size();
+                 }
+                 
+             Запит до бази даних повертає сутність автора з ліниво отриманою асоціацією з книгами, написаними цим автором. 
+             Hibernate ініціалізує атрибути книг за допомогою власної реалізації List , яка обробляє відкладене завантаження. 
+             Коли ви намагаєтесь отримати доступ до елемента в цьому списку або викликаєте метод, який працює з його елементами, 
+             реалізація списку Hibernate визнає, що активний сеанс недоступний, і викидає LazyInitializationException .    
+             
+             
+             Як НЕ виправляти LazyInitializationException:
+             
+             - Не використовуйте FetchType.EAGER
+                    Деякі розробники пропонують змінити FetchType асоціації на EAGER. 
+                    Звичайно, це виправляє LazyInitializationException, 
+                    але створює проблеми з продуктивністю, які виявлятимуться у PROD.
+                    
+                    Якщо ви встановите FetchType на EAGER , Hibernate завжди отримуватиме асоціацію, навіть якщо ви не 
+                    будете її використовувати. Це, очевидно, спричиняє накладні витрати, які сповільнюють вашу програму. 
+                    Але це стає ще гірше, якщо ви не використовуєте метод EntityManager.find і не посилаєтеся на асоціацію
+                    через JOIN FETCH . 
+                    Hibernate виконує додатковий запит для отримання асоціації. Це часто призводить до проблеми вибору n+1 , 
+                    яка є найпоширенішою причиною проблем із продуктивністю.
+
+                    Тому, будь ласка, не використовуйте FetchType.EAGER, ви завжди повинні віддавати перевагу FetchType.LAZY .
+                    
+                    
+              - Уникайте антишаблону Open Session in View   
+              
+                    Під час використання антипаттеру Open Session in View ви відкриваєте та закриваєте EntityManager 
+                    або Hibernate Session у своєму шарі перегляду (view layer). Потім ви викликаєте рівень сервісу, 
+                    який відкриває та фіксує транзакцію бази даних. Оскільки сеанс все ще відкритий після того, як рівень 
+                    сервісу повернув сутність, рівень перегляду може ініціалізувати ліниво отриману асоціацію.
+                    
+                    Але після того, як сервісний рівень зафіксував транзакцію бази даних, активної транзакції немає. 
+                    Через це Hibernate виконує кожну інструкцію SQL, ініційовану шаром перегляду, у режимі автоматичної 
+                    фіксації. Це збільшує навантаження на сервер бази даних, оскільки він повинен обробляти додаткову 
+                    транзакцію для кожного оператора SQL. Наприкінці кожної з цих транзакцій база даних має записати 
+                    журнал транзакцій на диск, що є дорогою операцією.
+                    
+                    Це також може дати суперечливі результати, оскільки зараз ви використовуєте 2 або більше незалежних 
+                    транзакцій. У результаті ліниво отримана асоціація може повертати дані, відмінні від даних, які 
+                    ваш сервісний рівень використовував для виконання бізнес-логіки. Потім ваш рівень перегляду 
+                    представляє обидві дані разом, і може здатися, що ваша програма керує неузгодженими даними.
+                    
+                    На жаль, Spring Boot за замовчуванням використовує антишаблон Open Session in View. 
+                    Він реєструє лише попереджувальні повідомлення.
+                            2020-03-06 16:18:21.292  WARN 11552 - – [  restartedMain] JpaBaseConfiguration$JpaWebConfiguration : 
+                                spring.jpa.open-in-view is enabled by default. Therefore, database queries may be 
+                                performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+
+                    Ви можете деактивувати його, встановивши для параметра spring.jpa.open-in-view у вашому файлі 
+                    application.properties значення false .
+
+            
+            - Не використовуйте hibernate.enable_lazy_load_no_trans
+            
+                        spring.jpa.properties.hibernate.enable_lazy_load_no_trans=true
+                        
+                  Цей параметр повідомляє Hibernate відкрити тимчасовий сеанс, якщо активний сеанс недоступний для 
+                  ініціалізації ліниво отриманого зв’язку. Це збільшує кількість використаних підключень до бази даних, 
+                  транзакцій бази даних і загальне навантаження на вашу базу даних.  
+                  
+                  
+      ----------------------------------------------------------------------------------------------------------------------------------------            
+            =  Як виправити LazyInitializationException
+                    
+                     Правильний спосіб виправити LazyInitializationException — це отримати всі необхідні асоціації в 
+                     межах рівня обслуговування. Найкращий варіант для цього — завантажити сутність з усіма необхідними 
+                     асоціаціями в одному запиті. Або ви можете використовувати проєкцію DTO, яка не підтримує відкладене 
+                     завантаження та потребує повної ініціалізації, перш ніж повертати її клієнту.    
+                     
+                     
+                - Ініціалізація асоціацій за допомогою пропозиції LEFT JOIN FETCH
+                    
+                          Найпростіший спосіб завантажити сутність із усіма необхідними асоціаціями — це виконати запит 
+                          JPQL або Criteria Query з одним або декількома пропозиціями LEFT JOIN FETCH. 
+                          Це вказує Hibernate не лише отримати сутність, на яку посилається в проекції, але й отримати 
+                          всі пов’язані сутності, на які є посилання в реченні LEFT JOIN FETCH.
+                          
+                          
+                                    EntityManager em = emf.createEntityManager();
+                                    em.getTransaction().begin();
+                                     
+                                    TypedQuery<Author> q = em.createQuery("SELECT a FROM Author a LEFT JOIN FETCH a.books", Author.class);
+                                    List<Author> authors = q.getResultList();
+                                     
+                                    em.getTransaction().commit();
+                                    em.close();
+                                     
+                                    for (Author a : authors) {
+                                        log.info(a.getName() + " wrote the books "
+                                            + a.getBooks().stream().map(b -> b.getTitle()).collect(Collectors.joining(", "))
+                                        );
+                                    }
+                          
+                          Запит вибирає сутності Author, а LEFT JOIN FETCH повідомляє Hibernate також отримати пов’язані 
+                          сутності Book. Як ви можете бачити в створеному операторі SQL, Hibernate не лише об’єднує 
+                          2 відповідні таблиці в FROM, але також додає всі стовпці, зіставлені сутністю Book, до SELECT.
+                          
+                                    select
+                                        author0_.id as id1_0_0_,
+                                        books1_.id as id1_2_1_,
+                                        author0_.name as name2_0_0_,
+                                        author0_.version as version3_0_0_,
+                                        books1_.author_id as author_i7_2_1_,
+                                        books1_.authorEager_id as authorEa8_2_1_,
+                                        books1_.publisher as publishe2_2_1_,
+                                        books1_.publishingDate as publishi3_2_1_,
+                                        books1_.sells as sells4_2_1_,
+                                        books1_.title as title5_2_1_,
+                                        books1_.version as version6_2_1_,
+                                        books1_.author_id as author_i7_2_0__,
+                                        books1_.id as id1_2_0__ 
+                                    from
+                                        Author author0_ 
+                                    left outer join
+                                        Book books1_ 
+                                            on author0_.id=books1_.author_id
+        
+        
+                          
+                 -  Використовуйте @NamedEntityGraph для ініціалізації асоціації     
+                       
+                       Ви можете зробити те саме за допомогою @NamedEntityGraph. Основна відмінність полягає в тому, 
+                       що визначення графіка не залежить від запиту. Це дає змогу використовувати той самий запит із 
+                       різними графіками або використовувати той самий графік із різними запитами.
+                       
+                       ...
+                       
+                
+                 - Використання проекції DTO
+                 
+                       альтернатива, яка навіть краще підходить для всіх операцій читання. 
+                       DTO забезпечують значно кращу продуктивність, якщо ви не хочете змінювати отриману інформацію.  
+                       
+                       У таких ситуаціях ви можете використовувати вираз конструктора, щоб сказати Hibernate створити 
+                       екземпляр об’єкта DTO для кожного запису в наборі результатів.
+                             
+                                EntityManager em = emf.createEntityManager();
+                                em.getTransaction().begin();
+                                 
+                                TypedQuery<AuthorDto> q = em.createQuery(
+                                        "SELECT new org.gratejava.dto.AuthorDto(a.name,b.title) FROM Author a JOIN a.books b",
+                                        AuthorDto.class);
+                                List<AuthorDto> authors = q.getResultList();
+                                 
+                                em.getTransaction().commit();
+                                em.close();
+                                 
+                                for (AuthorDto author : authors) {
+                                    log.info(author.getName() + " wrote the book " + author.getBookTitle());
+                                }
+                                
+                        Потім Hibernate генерує інструкцію SQL, яка вибирає лише ті стовпці, які відображаються атрибутами, 
+                        на які ви посилаєтеся під час виклику конструктора. Це часто зменшує кількість вибраних стовпців 
+                        і ще більше покращує продуктивність.
+                        
+                                select
+                                    author0_.name as col_0_0_,
+                                    books1_.title as col_1_0_ 
+                                from
+                                    Author author0_ 
+                                inner join
+                                    Book books1_ 
+                                        on author0_.id=books1_.author_id
+                                        
+                                        
+    ====================================================
+    
+    Висновок
+       
+        Є лише 2 хороших рішення LazyInitializationException проблеми:
+        
+        1. Ви ініціалізуєте всі необхідні асоціації, коли завантажуєте сутність за допомогою LEFT JOIN FETCH 
+           або @NamedEntityGraph або API EntityGraph.
+           
+        2. Ви використовуєте проекцію DTO замість сутностей. DTO не підтримують відкладене завантаження, і вам потрібно 
+           отримати всю необхідну інформацію на рівні сервісу.                                    
+                                
  */
