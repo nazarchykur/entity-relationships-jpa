@@ -9,6 +9,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.NoSuchElementException;
+
 @Slf4j
 @AllArgsConstructor
 @Service
@@ -44,7 +46,7 @@ public class PersonService {
         log.info("3. create a new Note and add it to existing Person (select = 1, insert = 1)");
 
         Person person = personRepository.findById(personId)
-                .orElseThrow(() -> new IllegalStateException("Person by this id=" + personId + " does not exist"));
+                .orElseThrow(() -> new NoSuchElementException("Person by this id=" + personId + " does not exist"));
 
         person.addNote(note);
     }
@@ -56,4 +58,9 @@ public class PersonService {
         log.info("4. save a new Note to existing Person by personId using Proxy = without loading Person to Hibernate Session = (select = 0, insert = 1)");
         personRepositoryCustom.saveNewNoteUsingProxy(personId, note);
     }
+
+//    public Person findById(Long personId) {
+//        return personRepository.findById(personId)
+//                .orElseThrow(() -> new NoSuchElementException("Person by this id=" + personId + " does not exist"));
+//    }
 }

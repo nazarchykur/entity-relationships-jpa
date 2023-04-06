@@ -3,15 +3,16 @@ package com.example.entityrelationshipsjpa;
 import com.example.entityrelationshipsjpa.entity.Note;
 import com.example.entityrelationshipsjpa.entity.Person;
 import com.example.entityrelationshipsjpa.repository.NoteRepository;
-import com.example.entityrelationshipsjpa.repository.PersonRepository;
 import com.example.entityrelationshipsjpa.service.NoteService;
 import com.example.entityrelationshipsjpa.service.PersonService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 @Slf4j
+@EnableTransactionManagement
 @SpringBootApplication
 public class EntityRelationshipsJpaApplication {
 
@@ -169,8 +170,8 @@ public class EntityRelationshipsJpaApplication {
         // failed to lazily initialize a collection of role: com.example.entityrelationshipsjpa.entity.Person.notes, could not initialize proxy - no Session
         // впаде через помилку = пізніше розглянемо як ефективно працювати з підгрузкою потрібного поля 
 
-        Person person2 = personService.findBy(1L);
-        log.info("get Person => " + person2);
+//        Person person2 = personService.findById(1L);
+//        log.info("get Person => " + person2);
 //        get Person => Person(id=1, firstName=Jane, lastName=Smith, email=janesmith@gmail.com, 
 //        notes=[Note(id=1, body=some note...), Note(id=3, body=new note 2), Note(id=4, body=new note 3)])
     }

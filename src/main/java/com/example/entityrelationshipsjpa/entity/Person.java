@@ -19,7 +19,7 @@ import java.util.List;
 
 @Getter
 @Setter
-@ToString()
+@ToString
 @NoArgsConstructor
 @Entity
 @Table(name = "persons")
@@ -39,6 +39,7 @@ public class Person {
     private String email;
 
     @OneToMany(mappedBy = "person", cascade = CascadeType.ALL, orphanRemoval = true)
+    @ToString.Exclude
     private List<Note> notes = new ArrayList<>();
     
     public void addNote(Note note) {
